@@ -294,6 +294,9 @@ def test_new_card_views():
     assert two["away"].active and two["away"].value == ""
     assert (two["weather"].label, two["weather"].value, two["weather"].detail) == \
         ("Clear night", "8.5°", "High 11° · Low 3°")
+    states["weather.home"]["state"] = "partlycloudy"
+    two = {v.id: v for v in build_scene(layout.pages[1], states, index=1, count=2).buttons}
+    assert two["weather"].label == "Partly cloudy"
 
 
 def test_press_reports_long_press_buttons_only(make_client):

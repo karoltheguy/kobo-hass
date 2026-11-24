@@ -98,6 +98,11 @@ def _pretty(text) -> str:
     return str(text).replace("_", " ").replace("-", " ").capitalize()
 
 
+# HA weather conditions that don't read well after _pretty().
+WEATHER_LABELS = {"partlycloudy": "Partly cloudy", "windy-variant": "Windy",
+                  "lightning-rainy": "Thunderstorm", "snowy-rainy": "Sleet"}
+
+
 def _state_number(state: dict | None):
     """A sensor's state as a float, or None when it isn't a number."""
     try:
@@ -157,7 +162,7 @@ def _weather_view(button: Button, s, attrs: dict, unavailable: bool,
         num = _state_number(states.get(eid)) if eid else None
         if num is not None:
             parts.append(f"{name} {_format_value(num, '°')}")
-    label = "unavailable" if unavailable else _pretty(s)
+    label = "unavailable" if unavailable else WEATHER_LABELS.get(str(s), _pretty(s))
     return ButtonView(button.id, label, value, False, unavailable, " · ".join(parts))
 
 
