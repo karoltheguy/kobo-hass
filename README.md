@@ -96,8 +96,10 @@ The unit passes the Podman secret `hadash_secret` to the container as
 `podman secret inspect --showsecret --format '{{.SecretData}}' hadash_secret`.
 
 After changing the Python code, rebuild the image and `systemctl --user restart hadash`.
-The container can't resolve `.local` names, so the unit pins `homeassistant.local`
-with `AddHost=`; update it if Home Assistant's IP changes. To start at boot without
+The container can't resolve `.local` names like `homeassistant.local`. Give Home
+Assistant a normal DNS name on your network (a record in your router or local DNS)
+and use it in `config.yaml`, or use its IP. If you must keep the `.local` name,
+uncomment `AddHost=` in the unit and set the IP there. To start at boot without
 logging in, run `loginctl enable-linger $USER` once.
 
 ### Docker Compose

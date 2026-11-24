@@ -18,8 +18,9 @@ PublishPort=8090:8090
 # The project folder holds config.yaml (with the HA token) and layout.yaml.
 # Read-only; layout.yaml edits are still picked up live.
 Volume=%h/Development/kobo-hass:/config:ro,z
-# The container can't resolve mDNS (.local) names; pin Home Assistant's address.
-AddHost=homeassistant.local:192.168.1.10
+# The container can't resolve mDNS (.local) names, so give Home Assistant a normal
+# DNS name (or an IP) in config.yaml. Or pin the .local name to its address here:
+# AddHost=homeassistant.local:192.168.1.10
 # The Kobo must send this with every request. The unit won't start until the secret exists.
 Secret=hadash_secret,type=env,target=HADASH_SECRET
 # Log timestamps in local time.

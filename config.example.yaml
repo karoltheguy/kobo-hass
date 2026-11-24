@@ -1,5 +1,6 @@
 # Copy to config.yaml and edit.
 homeassistant:
+  # In a container, .local (mDNS) names don't resolve: use a normal DNS name or an IP.
   url: http://homeassistant.local:8123
   # Better: leave this out and set the HA_TOKEN environment variable.
   token: ""
