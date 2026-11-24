@@ -1,0 +1,84 @@
+# Copy to layout.yaml and edit. The server reloads it when it changes.
+# Screen is 600x800, the title bar takes the top 64 px.
+# rect: [x, y, width, height]. Keep tap targets at least ~120 px.
+#
+# display:
+#   toggle  black fill when the entity is "on" (or any of on_states), status line below
+#   value   shows the state, or `attribute`, in big type with an optional unit
+#   action  plain button (scenes, scripts)
+#   climate name, current temperature and [-] target [+]; at least 390 px wide.
+#           `presets: [away, home, sleep]` adds a row of preset buttons inside the card
+#           (needs 110 px more height, 220 px total); `preset_labels: {sleep: Night}` renames them.
+#           `eco_preset: Energy heat` adds an Eco pill instead; tapping the name side of the
+#           card switches between it and `normal_preset` (default "none").
+# action: "domain.service". entity_id is added to the call unless `data` sets it.
+#
+# Icons (toggle, value and action cards): `top_icon` sits above the label, `icon`
+# between the label and the state. Either one is an emoji (drawn with a black-and-white
+# emoji font) or an image file, relative to this file; dark on transparent/white works
+# best, and it is inverted on a black (on) card. Map states to icons to change with
+# the state; `default` covers the rest:  icon: {on: "💡", off: bulb-off.png, default: "❓"}
+# `icon_size: 48` sets their height in px (default: fits the card).
+
+title: Home
+
+buttons:
+  - id: living
+    rect: [20, 84, 270, 170]
+    label: Living room
+    entity: light.living_room
+    action: light.toggle
+    display: toggle
+    icon: "💡"
+
+  - id: kitchen
+    rect: [310, 84, 270, 170]
+    label: Kitchen
+    entity: light.kitchen
+    action: light.toggle
+    display: toggle
+
+  - id: bedroom
+    rect: [20, 274, 270, 170]
+    label: Bedroom
+    entity: light.bedroom
+    action: light.toggle
+    display: toggle
+
+  - id: porch
+    rect: [310, 274, 270, 170]
+    label: Porch
+    entity: switch.porch
+    action: switch.toggle
+    display: toggle
+
+  - id: thermostat
+    rect: [20, 464, 270, 150]
+    label: Inside
+    entity: climate.thermostat
+    attribute: current_temperature
+    unit: "°"
+    display: value
+
+  - id: outside
+    rect: [310, 464, 270, 150]
+    label: Outside
+    entity: sensor.outdoor_temperature
+    unit: "°"
+    display: value
+
+  - id: goodnight
+    rect: [20, 634, 270, 146]
+    label: Good night
+    top_icon: "🌙"
+    entity: scene.good_night
+    action: scene.turn_on
+    display: action
+
+  - id: alloff
+    rect: [310, 634, 270, 146]
+    label: All lights off
+    action: light.turn_off
+    data:
+      entity_id: all
+    display: action

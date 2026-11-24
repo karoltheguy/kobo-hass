@@ -1,0 +1,27 @@
+# Podman Quadlet unit for the hadash server (rootless, per-user).
+# Install: cp deploy/hadash.container ~/.config/containers/systemd/
+#          systemctl --user daemon-reload && systemctl --user start hadash
+# Rebuild after code changes: podman build -t localhost/hadash . && systemctl --user restart hadash
+
+[Unit]
+Description=hadash: Home Assistant dashboard for the Kobo
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+Image=localhost/hadash:latest
+ContainerName=hadash
+PublishPort=8090:8090
+# The project folder holds config.yaml (with the HA token) and layout.yaml.
+# Read-only; layout.yaml edits are still picked up live.
+Volume=%h/Development/kobo-hass:/config:ro,z
+# The container can't resolve mDNS (.local) names; pin Home Assistant's address.
+AddHost=homeassistant.local:192.168.1.10
+# Log timestamps in local time.
+Volume=/etc/localtime:/etc/localtime:ro
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

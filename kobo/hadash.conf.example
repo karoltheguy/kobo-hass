@@ -1,0 +1,28 @@
+# Copy to hadash.conf (same folder as hadash.sh) and edit.
+
+# Dashboard server, plain HTTP. A normal DNS name works (tested on the
+# N905C); mDNS .local names don't. Changing what the name points to in your
+# DNS moves the Kobo to another server without touching this file.
+SERVER=http://192.168.1.10:8080
+
+SCREEN_W=600
+SCREEN_H=800
+
+# Input devices. Check with: cat /proc/bus/input/devices
+TOUCH_DEV=/dev/input/event1
+KEY_DEV=/dev/input/event0
+
+# Touch mapping comes from touch.conf, written by calibrate.sh.
+
+POLL_SECS=3       # how often to ask the server whether the screen changed
+OFFLINE_AFTER=3   # failed polls in a row before the "can't reach" screen
+NIGHTLY_FULL=03:00  # once a day: flash the screen clean (HH:MM, empty = off)
+FULL_EVERY=10     # full (flashing) refresh after this many partial ones...
+FULL_SECS=300     # ...or after this many seconds, whichever comes first
+
+# What the Home button (or a 1.5 s hold in the top-left corner) does:
+#   reboot  restart the Kobo (slow but reliable)
+#   nickel  restart Nickel without rebooting (untested)
+#   none    stop hadash and leave the screen as is
+EXIT_ACTION=reboot
+LONGPRESS_MS=1500

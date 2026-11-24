@@ -1,0 +1,27 @@
+# hadash server with Docker Compose (or `podman compose`).
+#   docker compose up -d --build     # build and start, listens on :8090
+#   docker compose logs -f           # logs
+# The project folder (config.yaml + layout.yaml) is mounted read-only at /config;
+# layout.yaml edits are still picked up live.
+
+services:
+  hadash:
+    build: .
+    image: localhost/hadash:latest
+    container_name: hadash
+    restart: unless-stopped
+    # Pin the port so it matches the mapping below whatever config.yaml says.
+    command: ["hadash", "-c", "/config/config.yaml", "serve", "--port", "8090"]
+    ports:
+      - "8090:8090"
+    environment:
+      # Long-lived HA access token. Put HA_TOKEN=... in a .env file next to this
+      # one, or leave it unset and use homeassistant.token in config.yaml.
+      HA_TOKEN: ${HA_TOKEN:-}
+    volumes:
+      - ./:/config:ro,z
+      - /etc/localtime:/etc/localtime:ro
+    # Containers can't resolve mDNS (.local) names. If config.yaml points at
+    # homeassistant.local, pin its address here (or use the IP in config.yaml).
+    # extra_hosts:
+    #   - "homeassistant.local:192.168.1.10"

@@ -1,0 +1,13 @@
+__pycache__/
+.venv/
+config.yaml
+layout.yaml
+*.png
+!docs/*.png
+kobo/hadash.conf
+kobo/touch.conf
+kobo/fbink
+*.bak
+.codacy/codacy.config.baseline.json
+.pytest_cache/
+.env

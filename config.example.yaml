@@ -1,0 +1,25 @@
+# Copy to config.yaml and edit.
+homeassistant:
+  url: http://homeassistant.local:8123
+  # Better: leave this out and set the HA_TOKEN environment variable.
+  token: ""
+  # true = use a fake in-memory Home Assistant (for building the layout).
+  mock: false
+
+screen:
+  width: 600
+  height: 800
+
+layout: layout.yaml
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  tap_settle_timeout: 2.0   # seconds to wait for HA to apply a tap's change
+  state_cache_ttl: 1.0      # seconds; /version and /dashboard.png share one fetch
+
+# Optional TTF paths. Defaults to DejaVu/Liberation/Noto if installed.
+# fonts:
+#   regular: /usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf
+#   bold: /usr/share/fonts/dejavu-sans-fonts/DejaVuSans-Bold.ttf
+#   icon: /usr/share/fonts/google-noto-emoji-fonts/NotoEmoji-Regular.ttf  # emoji icons

@@ -1,0 +1,21 @@
+[project]
+name = "hadash"
+version = "0.1.0"
+description = "Home Assistant dashboard server for a Kobo e-ink thin client"
+requires-python = ">=3.11"
+dependencies = [
+    "flask>=3.0",
+    "pillow>=13.0",
+    "pyyaml>=6.0",
+    "requests>=2.31",
+]
+
+[project.scripts]
+hadash = "hadash.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

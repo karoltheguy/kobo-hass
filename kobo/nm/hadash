@@ -1,0 +1,2 @@
+# NickelMenu entry. Copy to /mnt/onboard/.adds/nm/hadash
+menu_item :main :HA Dashboard :cmd_spawn :quiet :exec /bin/sh /mnt/onboard/.adds/hadash/hadash.sh

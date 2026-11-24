@@ -1,0 +1,5 @@
+*
+!pyproject.toml
+!uv.lock
+!hadash/
+hadash/__pycache__/
