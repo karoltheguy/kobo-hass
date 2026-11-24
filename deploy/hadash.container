@@ -2,6 +2,9 @@
 # Install: cp deploy/hadash.container ~/.config/containers/systemd/
 #          systemctl --user daemon-reload && systemctl --user start hadash
 # Rebuild after code changes: podman build -t localhost/hadash . && systemctl --user restart hadash
+# Shared secret (SECRET in the Kobo's hadash.conf), stored as a Podman secret:
+#   openssl rand -hex 16 | tr -d '\n' | podman secret create hadash_secret -
+#   podman secret inspect --showsecret --format '{{.SecretData}}' hadash_secret
 
 [Unit]
 Description=hadash: Home Assistant dashboard for the Kobo
@@ -17,6 +20,8 @@ PublishPort=8090:8090
 Volume=%h/Development/kobo-hass:/config:ro,z
 # The container can't resolve mDNS (.local) names; pin Home Assistant's address.
 AddHost=homeassistant.local:192.168.1.10
+# The Kobo must send this with every request. The unit won't start until the secret exists.
+Secret=hadash_secret,type=env,target=HADASH_SECRET
 # Log timestamps in local time.
 Volume=/etc/localtime:/etc/localtime:ro
 

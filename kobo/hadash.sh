@@ -60,6 +60,12 @@ show_offline() {
     [ -f "$RUN/offline" ] && return
     touch "$RUN/offline" "$RUN/needfull"
     rm -f "$RUN/version"
+    # 403: the server is there but wants a different SECRET.
+    if grep -q 403 "$RUN/wget.err" 2>/dev/null; then
+        log "server rejected the key: check SECRET in hadash.conf"
+        fb_message "The server rejected this Kobo" "Check SECRET in hadash.conf" "Retrying..."
+        return
+    fi
     log "server unreachable"
     fb_message "Can't reach the dashboard server" "$SERVER" "Retrying..."
 }
@@ -168,7 +174,7 @@ poller() {
 hold_feedback() {
     # $WGET_T is empty or "-T 10", and $resp is split into words: both unquoted on purpose.
     # shellcheck disable=SC2086
-    resp=$(wget -q $WGET_T -O - "$SERVER/press?x=$1&y=$2" 2>/dev/null)
+    resp=$(wget -q $WGET_T -O - "$SERVER$(with_key "/press?x=$1&y=$2")" 2>/dev/null)
     token=$3
     # shellcheck disable=SC2086
     set -- $resp
@@ -217,9 +223,7 @@ handle_taps() {
         if [ "$dur" -ge "$LONGPRESS_MS" ] && [ "$x" -lt 120 ] && [ "$y" -lt 120 ]; then
             exit_dashboard
         fi
-        # Unquoted on purpose, as in hold_feedback.
-        # shellcheck disable=SC2086
-        resp=$(wget -q $WGET_T -O - "$SERVER/tap?x=$x&y=$y&ms=$dur" 2>/dev/null)
+        resp=$(http_get "/tap?x=$x&y=$y&ms=$dur" -)
         # shellcheck disable=SC2086
         set -- $resp
         case $1 in

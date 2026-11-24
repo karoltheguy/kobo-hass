@@ -5,6 +5,10 @@
 # DNS moves the Kobo to another server without touching this file.
 SERVER=http://192.168.1.10:8080
 
+# Shared secret: the same value as HADASH_SECRET on the server. Leave empty if
+# the server runs without one. Make one with: openssl rand -hex 16
+SECRET=
+
 SCREEN_W=600
 SCREEN_H=800
 

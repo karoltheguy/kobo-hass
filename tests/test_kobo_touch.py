@@ -185,3 +185,17 @@ def test_down_reported_once_per_press_even_with_pressure_wobble():
         ev(t0 + 3000, EV_ABS, ABS_PRESSURE, 0), ev(t0 + 3000, EV_KEY, BTN_TOUCH, 0), syn(t0 + 3000),
     ])
     assert [t[0] for t in run_touch(data, downs=1)] == ["down", "tap"]
+
+
+@pytest.mark.parametrize("secret, path, expected", [
+    ("", "/version", "/version"),
+    ("s3cret", "/version", "/version?key=s3cret"),
+    ("s3cret", "/tap?x=1&y=2", "/tap?x=1&y=2&key=s3cret"),
+])
+def test_with_key_adds_the_secret(tmp_path, secret, path, expected):
+    (tmp_path / "hadash.conf").write_text(f"SECRET={secret}\n")
+    out = subprocess.run(
+        ["sh", "-c", f'. "{KOBO}/lib.sh"; with_key "$1"', "sh", path],
+        env={"HADASH_DIR": str(tmp_path), "RUN": str(tmp_path / "run"), "PATH": "/usr/bin:/bin"},
+        capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == expected

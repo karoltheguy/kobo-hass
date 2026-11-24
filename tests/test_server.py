@@ -48,10 +48,10 @@ class FailingHA(FakeHA):
 
 @pytest.fixture
 def make_client(tmp_path):
-    def make(ha=None, layout=LAYOUT):
+    def make(ha=None, layout=LAYOUT, secret=""):
         (tmp_path / "layout.yaml").write_text(layout)
         cfg = Config(mock=True, layout_path=tmp_path / "layout.yaml",
-                     state_cache_ttl=0, tap_settle_timeout=0.5)
+                     state_cache_ttl=0, tap_settle_timeout=0.5, secret=secret)
         ha = ha or FakeHA()
         ha._states["light.lamp"] = {"entity_id": "light.lamp", "state": "off", "attributes": {}}
         return create_app(cfg, ha).test_client(), ha
@@ -432,3 +432,56 @@ def test_icon_validation(tmp_path):
     with pytest.raises(LayoutError, match="only works on"):
         parse_layout({"buttons": [{"id": "h", "rect": [0, 0, 560, 150], "entity": "climate.x",
                                    "display": "climate", "icon": "🔥"}]})
+
+
+SECRET = "0123456789abcdef0123"
+
+
+def test_secret_required_on_every_endpoint(make_client):
+    client, ha = make_client(secret=SECRET)
+    for path in ("/", "/version", "/dashboard.png", "/press?x=1&y=1", "/tap?x=100&y=150"):
+        assert client.get(path).status_code == 403, path
+        sep = "&" if "?" in path else "?"
+        assert client.get(f"{path}{sep}key=wrong-key-wrong-key").status_code == 403, path
+        assert client.get(f"{path}{sep}key={SECRET}").status_code == 200, path
+    assert client.get("/version", headers={"X-Hadash-Key": SECRET}).status_code == 200
+    assert client.get("/tap?x=100&y=150").text.strip() == "error bad-key"
+
+
+def test_rejected_tap_calls_nothing(make_client):
+    client, ha = make_client(secret=SECRET)
+    calls = []
+    ha.call_service = lambda *a: calls.append(a)
+    client.post("/tap?x=100&y=150&ms=5000")
+    assert calls == []
+    client.post(f"/tap?x=100&y=150&key={SECRET}")
+    assert len(calls) == 1
+
+
+def test_no_secret_means_open(make_client):
+    client, _ = make_client()
+    assert client.get("/version").status_code == 200
+
+
+@pytest.mark.parametrize("value, ok", [
+    ("", True), (SECRET, True), ("a-B_9" * 4, True),
+    ("short", False), ("has space in it 1234", False), ("amp&ersand-1234567", False),
+])
+def test_secret_from_env(monkeypatch, tmp_path, value, ok):
+    from hadash.config import ConfigError
+    monkeypatch.setenv("HADASH_SECRET", value)
+    if ok:
+        assert load_config(tmp_path / "none.yaml").secret == value
+    else:
+        with pytest.raises(ConfigError, match="HADASH_SECRET"):
+            load_config(tmp_path / "none.yaml")
+
+
+def test_access_log_hides_the_key():
+    import logging
+    from hadash.app import _HideKey
+    rec = logging.LogRecord("werkzeug", logging.INFO, "", 0, '%s - - "%s" %s %s',
+                            ("1.2.3.4", f"GET /tap?x=1&key={SECRET}&y=2 HTTP/1.1", "200", "-"),
+                            None)
+    _HideKey().filter(rec)
+    assert SECRET not in rec.getMessage() and "key=***&y=2" in rec.getMessage()

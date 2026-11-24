@@ -25,7 +25,7 @@ Plug the Kobo in over USB and copy into `.adds/hadash/` on the Kobo drive:
 ```
 .adds/hadash/
   hadash.sh  calibrate.sh  lib.sh  touch.awk  calib.awk
-  hadash.conf        (from hadash.conf.example, with SERVER set)
+  hadash.conf        (from hadash.conf.example, with SERVER and SECRET set)
   fbink              (ARM FBInk binary WITH image support, see below)
 ```
 
@@ -51,6 +51,24 @@ make $M libi2c.built && make $M LDFLAGS=-static static   # -> Release/fbink
 DHCP and resolves the name on every request, so repointing the name in DNS
 switches servers. mDNS `.local` names don't work. A fixed IP for the Kobo
 itself (a DHCP reservation) still helps for telnet/SSH.
+
+## Shared secret
+
+`SECRET` in `hadash.conf` must match `HADASH_SECRET` on the server (see
+[Shared secret](../README.md#shared-secret) in the main README). Leave it empty
+only if the server runs without one. `with_key` in `lib.sh` adds it to every
+request as `?key=` or `&key=`. A URL parameter rather than a header, because
+BusyBox `wget` on older firmware may not take `--header`.
+
+If the server answers 403, the screen says "The server rejected this Kobo" and
+`/tmp/hadash/log` says "server rejected the key". Fix `SECRET` and relaunch.
+To check by hand from a shell on the Kobo:
+
+```sh
+cd /mnt/onboard/.adds/hadash && . ./lib.sh
+http_get /version -; echo " rc=$?"     # a version hash means the key works
+last_http_error                        # "... 403 FORBIDDEN" means a wrong key
+```
 
 ## Bring-up on the device (milestones 2 and 3)
 
@@ -80,6 +98,43 @@ Check that NickelMenu supports your firmware, install it, then copy
 `nm/hadash` to `.adds/nm/hadash`. An "HA Dashboard" item appears in the main
 menu. Turn WiFi on in Nickel before launching: the script keeps Nickel's
 connection and only tries its own bring-up if the server can't be reached.
+
+## Updating over Wi-Fi
+
+No need for USB once telnet works. Serve the new files from the computer with
+the checkout, then fetch them on the Kobo. Quit the dashboard first (Nickel
+running): a shell script that is replaced while running can break, and
+`hadash.conf` is only read at start.
+
+On the computer:
+
+```sh
+mkdir /tmp/kobo-push && cp kobo/lib.sh kobo/hadash.sh /tmp/kobo-push/
+python3 -m http.server 8099 --directory /tmp/kobo-push   # Ctrl-C when done
+```
+
+On the Kobo (`telnet <kobo-ip>`), with `<pc>` the computer's IP:
+
+```sh
+cd /mnt/onboard/.adds/hadash
+for f in lib.sh hadash.sh hadash.conf; do cp $f $f.bak; done    # to roll back
+wget -q -O lib.sh.new http://<pc>:8099/lib.sh &&
+wget -q -O hadash.sh.new http://<pc>:8099/hadash.sh &&
+mv lib.sh.new lib.sh && mv hadash.sh.new hadash.sh
+sh -n hadash.sh && md5sum lib.sh hadash.sh    # compare with md5sum on the computer
+```
+
+Don't put `hadash.conf` on the web server, since it holds the secret. Edit it
+over telnet instead, e.g. to add the secret after `SERVER=`:
+
+```sh
+sed -i '/^SERVER=/a SECRET=<the secret>' hadash.conf
+```
+
+To roll back: `for f in lib.sh hadash.sh hadash.conf; do mv $f.bak $f; done`.
+
+The dashboard can also be started from telnet instead of NickelMenu:
+`setsid sh /mnt/onboard/.adds/hadash/hadash.sh </dev/null >/dev/null 2>&1 &`
 
 ## Exiting
 

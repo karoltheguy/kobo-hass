@@ -7,7 +7,7 @@ import logging
 import sys
 
 from .app import Dashboard, create_app
-from .config import load_config
+from .config import ConfigError, load_config
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -27,7 +27,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
-    config = load_config(args.config)
+    try:
+        config = load_config(args.config)
+    except ConfigError as exc:
+        print(f"hadash: {exc}", file=sys.stderr)
+        return 2
     if args.mock:
         config.mock = True
 
@@ -39,8 +43,12 @@ def main(argv: list[str] | None = None) -> int:
 
     app = create_app(config)
     host, port = args.host or config.host, args.port or config.port
-    print(f"hadash: preview at http://{'localhost' if host == '0.0.0.0' else host}:{port}/",
+    key = "?key=<HADASH_SECRET>" if config.secret else ""  # the log must not hold the secret
+    print(f"hadash: preview at http://{'localhost' if host == '0.0.0.0' else host}:{port}/{key}",
           file=sys.stderr)
+    if not config.secret:
+        logging.warning("HADASH_SECRET is not set: anyone who can reach this server can "
+                        "press its buttons, including long presses like unlock")
     app.run(host=host, port=port, threaded=True)
     return 0
 

@@ -5,12 +5,13 @@
 # Sourced, not run.
 
 HADASH_DIR=${HADASH_DIR:-/mnt/onboard/.adds/hadash}
-RUN=/tmp/hadash
+RUN=${RUN:-/tmp/hadash}
 mkdir -p "$RUN"
 
 # -- config ---------------------------------------------------------------
 
 SERVER=""
+SECRET=""
 SCREEN_W=600
 SCREEN_H=800
 TOUCH_DEV=/dev/input/event1
@@ -61,11 +62,24 @@ msleep() {
 WGET_T=""
 if wget --help 2>&1 | grep -q -- '-T '; then WGET_T="-T 10"; fi
 
+# with_key <path>  The path with the server's shared secret added (?key=... or
+# &key=...) when SECRET is set. Every request to the server goes through this.
+with_key() {
+    if [ -z "$SECRET" ]; then
+        echo "$1"
+        return
+    fi
+    case $1 in
+        *\?*) echo "$1&key=$SECRET" ;;
+        *) echo "$1?key=$SECRET" ;;
+    esac
+}
+
 # http_get <path> <outfile>   (outfile "-" prints to stdout)
 http_get() {
     # shellcheck disable=SC2086
     # Keep wget's complaint (DNS, timeout, refused...) for the failure log.
-    wget -q $WGET_T -O "$2" "$SERVER$1" 2>"$RUN/wget.err"
+    wget -q $WGET_T -O "$2" "$SERVER$(with_key "$1")" 2>"$RUN/wget.err"
 }
 
 # last_http_error  One line describing why the last http_get failed.

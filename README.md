@@ -11,7 +11,7 @@ reports touch coordinates. See `plan.md` for the full design.
 
 ## Contents
 
-- [Server](#server): run it locally, or in Podman or Docker
+- [Server](#server): run it locally, set the shared secret, or run in Podman or Docker
 - [Layout](#layout): buttons, pages, display types, long press, icons
 - [Kobo](#kobo): install the client, calibrate touch, use it
 - [Development](#development): server endpoints, tests
@@ -22,10 +22,12 @@ reports touch coordinates. See `plan.md` for the full design.
 cp config.example.yaml config.yaml   # set the HA URL; set mock: true to try it without HA
 cp layout.example.yaml layout.yaml   # buttons, entities and actions
 export HA_TOKEN=...                  # long-lived access token from your HA profile
+export HADASH_SECRET=$(openssl rand -hex 16)   # shared secret, see below
 uv run hadash serve
 ```
 
-Open http://localhost:8080/ for the preview. Click the screen to simulate taps.
+Open http://localhost:8080/?key=<your secret> for the preview (just
+http://localhost:8080/ without a secret). Click the screen to simulate taps.
 Edits to `layout.yaml` are picked up on the next request.
 
 ![Browser preview with the example layout in mock mode, and the tap log on the right](docs/preview.png)
@@ -35,6 +37,46 @@ The log on the right shows each tap's coordinates and the server's reply
 
 `uv run hadash --mock render -o out.png` writes a single frame without a server.
 
+### Shared secret
+
+Without a secret, anyone who can reach the server can press its buttons,
+including long presses like unlocking a door. That includes any web page opened
+in a browser on your network, since a page can make your browser send the request.
+So set one:
+
+- On the server, the `HADASH_SECRET` environment variable: at least 16
+  characters of `A-Z a-z 0-9 _ -`. `openssl rand -hex 16` makes a good one. The
+  server refuses to start with a bad value, and logs a warning when there is none.
+- On the Kobo, the same value as `SECRET=` in `hadash.conf`.
+
+With a secret set, every request needs it, as `?key=<secret>` (what the Kobo
+sends) or an `X-Hadash-Key` header. Anything else gets `403 error bad-key` and
+is logged. If the Kobo's key is wrong, its screen says
+"The server rejected this Kobo".
+
+The key travels in plain HTTP, so it keeps out other web pages and devices, not
+someone who can watch your Wi-Fi traffic. The server's request log shows it as
+`key=***`.
+
+**Adding a secret to a running setup.** Update the Kobo first. A server
+without a secret ignores the extra `key=`, so the Kobo keeps working while you
+switch over.
+
+1. Make the secret (Podman shown; for Compose, put it in `.env`):
+   `openssl rand -hex 16 | tr -d '\n' | podman secret create hadash_secret -`
+2. Quit the dashboard on the Kobo. Copy the current `kobo/lib.sh` and
+   `kobo/hadash.sh` to it, and add `SECRET=<the secret>` to its `hadash.conf`
+   (USB, or over Wi-Fi as in [kobo/README.md](kobo/README.md#updating-over-wi-fi)).
+   Read the secret back with
+   `podman secret inspect --showsecret --format '{{.SecretData}}' hadash_secret`.
+3. Install the unit with the `Secret=` line and restart the server:
+   `cp deploy/hadash.container ~/.config/containers/systemd/ && systemctl --user daemon-reload && systemctl --user restart hadash`
+4. Check: `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8090/version`
+   says `403`, and the Kobo still updates.
+
+To change the secret later, replace it (`podman secret rm hadash_secret`, then
+step 1), update `SECRET` on the Kobo, and restart both.
+
 ### Podman Quadlet
 
 The image holds only the code; `config.yaml` and `layout.yaml` stay in the project
@@ -42,11 +84,16 @@ folder, which is mounted read-only at `/config` (layout edits still reload live)
 
 ```sh
 podman build -t localhost/hadash .
+openssl rand -hex 16 | tr -d '\n' | podman secret create hadash_secret -
 cp deploy/hadash.container ~/.config/containers/systemd/
 systemctl --user daemon-reload
 systemctl --user start hadash          # listens on :8090
 journalctl --user -u hadash -f         # logs
 ```
+
+The unit passes the Podman secret `hadash_secret` to the container as
+`HADASH_SECRET`. To read it back for the Kobo's `hadash.conf`:
+`podman secret inspect --showsecret --format '{{.SecretData}}' hadash_secret`.
 
 After changing the Python code, rebuild the image and `systemctl --user restart hadash`.
 The container can't resolve `.local` names, so the unit pins `homeassistant.local`
@@ -62,6 +109,7 @@ the same way. It works with `docker compose` and `podman compose`.
 cp config.example.yaml config.yaml     # then edit, as above
 cp layout.example.yaml layout.yaml
 echo "HA_TOKEN=..." > .env             # or set homeassistant.token in config.yaml
+echo "HADASH_SECRET=$(openssl rand -hex 16)" >> .env
 docker compose up -d --build           # listens on :8090
 docker compose logs -f                 # logs
 ```
@@ -262,7 +310,8 @@ draw on the screen. Nothing runs on the Kobo besides what ships with it.
 3. Edit `.adds/hadash/hadash.conf` and set `SERVER` to the server's address,
    e.g. `http://192.168.1.10:8090` for the container (`:8080` for
    `uv run hadash serve`). Use an IP or a normal DNS name; `.local` names
-   don't resolve on the Kobo.
+   don't resolve on the Kobo. Set `SECRET` to the server's `HADASH_SECRET`
+   (see [Shared secret](#shared-secret)).
 4. Eject the Kobo. NickelMenu now has an **HA Dashboard** entry.
 
 ### Touch calibration
@@ -296,6 +345,9 @@ is in `/tmp/hadash/log` on the Kobo.
 ## Development
 
 ### Server endpoints
+
+With `HADASH_SECRET` set, every endpoint needs `key=<secret>` in the query (or an
+`X-Hadash-Key` header) and answers `403 error bad-key` without it.
 
 | Endpoint | Returns |
 |---|---|

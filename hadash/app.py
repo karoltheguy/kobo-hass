@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hmac
 import logging
+import re
 import threading
 import time
 from pathlib import Path
@@ -15,6 +17,19 @@ from .layout import MAX_LONG_MS, Button, Layout, LayoutError, load_layout
 from .render import NAV_H, Renderer, Scene, build_scene, to_png
 
 log = logging.getLogger(__name__)
+
+
+class _HideKey(logging.Filter):
+    """Werkzeug's access log prints whole URLs; keep the ?key= secret out of it."""
+
+    _KEY = re.compile(r"([?&]key=)[^&\s\"]+")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.args:
+            record.args = tuple(self._KEY.sub(r"\1***", a) if isinstance(a, str) else a
+                                for a in record.args)
+        record.msg = self._KEY.sub(r"\1***", str(record.msg))
+        return True
 
 TAP_ERROR_TTL = 30.0
 
@@ -231,7 +246,7 @@ PREVIEW_HTML = """<!doctype html>
  label { display: block; margin-bottom: 8px; }
 </style></head>
 <body><div class="wrap">
- <img id="screen" src="dashboard.png" alt="dashboard">
+ <img id="screen" alt="dashboard">
  <div>
   <label><input type="checkbox" id="eink" checked> simulate e-ink flash on refresh</label>
   <label>Shift-click = long press (3.5 s)</label>
@@ -239,6 +254,9 @@ PREVIEW_HTML = """<!doctype html>
  </div>
 </div>
 <script>
+// Open the preview as /?key=<HADASH_SECRET>; every request below carries it along.
+const key = new URLSearchParams(location.search).get('key');
+const k = key ? 'key=' + encodeURIComponent(key) + '&' : '';
 const img = document.getElementById('screen');
 const logEl = document.getElementById('log');
 let version = null;
@@ -247,7 +265,7 @@ function reload(pressed) {
   const flash = document.getElementById('eink').checked;
   if (flash) img.style.filter = 'invert(1)';
   const q = pressed ? '&pressed=' + encodeURIComponent(pressed) : '';
-  img.src = 'dashboard.png?t=' + Date.now() + q;
+  img.src = 'dashboard.png?' + k + 't=' + Date.now() + q;
   img.onload = () => { img.style.filter = ''; };
 }
 img.addEventListener('click', async (e) => {
@@ -255,15 +273,16 @@ img.addEventListener('click', async (e) => {
   const sx = %(w)d / (r.width - 24), sy = %(h)d / (r.height - 24);
   const x = Math.round((e.clientX - r.left - 12) * sx), y = Math.round((e.clientY - r.top - 12) * sy);
   const ms = e.shiftKey ? 3500 : 100;  // shift-click = long press
-  const resp = await fetch('tap?x=' + x + '&y=' + y + '&ms=' + ms, {method: 'POST'});
+  const resp = await fetch('tap?' + k + 'x=' + x + '&y=' + y + '&ms=' + ms, {method: 'POST'});
   const text = (await resp.text()).trim();
   log('tap ' + x + ',' + y + ' -> ' + text);
   const [kind, v, id] = text.split(' ');
   version = v;
   if (kind !== 'none') reload();
 });
+img.src = 'dashboard.png?' + k;
 setInterval(async () => {
-  const v = (await (await fetch('version')).text()).trim();
+  const v = (await (await fetch('version?' + k)).text()).trim();
   if (version !== null && v !== version) { log('version ' + v + ' (changed elsewhere)'); reload(); }
   version = v;
 }, 3000);
@@ -273,12 +292,28 @@ setInterval(async () => {
 
 def create_app(config: Config, ha=None) -> Flask:
     app = Flask(__name__)
+    if not any(isinstance(f, _HideKey) for f in logging.getLogger("werkzeug").filters):
+        logging.getLogger("werkzeug").addFilter(_HideKey())
     dash = Dashboard(config, ha)
     app.config["dashboard"] = dash
 
     def text(body: str) -> Response:
         return Response(body + "\n", mimetype="text/plain",
                         headers={"Cache-Control": "no-store"})
+
+    @app.before_request
+    def check_key():
+        # With HADASH_SECRET set, every request needs it, as ?key= (what the Kobo
+        # sends) or an X-Hadash-Key header. Without it, a web page opened anywhere
+        # on the network could fire /tap requests, unlocks included.
+        if not config.secret or request.path == "/favicon.ico":  # browsers ask on their own; 404s
+            return None
+        given = request.args.get("key") or request.headers.get("X-Hadash-Key") or ""
+        if hmac.compare_digest(given.encode(), config.secret.encode()):
+            return None
+        log.warning("rejected %s %s from %s: %s key", request.method, request.path,
+                    request.remote_addr, "wrong" if given else "no")
+        return text("error bad-key"), 403
 
     @app.get("/dashboard.png")
     def dashboard_png():

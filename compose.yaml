@@ -18,6 +18,9 @@ services:
       # Long-lived HA access token. Put HA_TOKEN=... in a .env file next to this
       # one, or leave it unset and use homeassistant.token in config.yaml.
       HA_TOKEN: ${HA_TOKEN:-}
+      # Shared secret the Kobo sends with every request (SECRET in its hadash.conf).
+      # Put HADASH_SECRET=... in .env too; make one with `openssl rand -hex 16`.
+      HADASH_SECRET: ${HADASH_SECRET:-}
     volumes:
       - ./:/config:ro,z
       - /etc/localtime:/etc/localtime:ro

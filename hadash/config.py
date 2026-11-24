@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,6 +27,24 @@ class Config:
     tap_settle_timeout: float = 2.0
     # States are cached this long so /version and /dashboard.png share one fetch.
     state_cache_ttl: float = 1.0
+    # Shared secret the Kobo sends as ?key=. From HADASH_SECRET only; empty = no check.
+    secret: str = ""
+
+
+# The Kobo puts the secret in a URL with plain shell, so no characters that need escaping.
+SECRET_RE = re.compile(r"[A-Za-z0-9_-]{16,}")
+
+
+class ConfigError(ValueError):
+    pass
+
+
+def secret_from_env() -> str:
+    secret = os.environ.get("HADASH_SECRET", "").strip()
+    if secret and not SECRET_RE.fullmatch(secret):
+        raise ConfigError("HADASH_SECRET must be at least 16 characters of A-Z a-z 0-9 _ - "
+                          "(try: openssl rand -hex 16)")
+    return secret
 
 
 def load_config(path: str | Path) -> Config:
@@ -57,4 +76,5 @@ def load_config(path: str | Path) -> Config:
         port=int(server.get("port", 8080)),
         tap_settle_timeout=float(server.get("tap_settle_timeout", 2.0)),
         state_cache_ttl=float(server.get("state_cache_ttl", 1.0)),
+        secret=secret_from_env(),
     )
