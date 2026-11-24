@@ -3,6 +3,8 @@ name = "hadash"
 version = "0.1.0"
 description = "Home Assistant dashboard server for a Kobo e-ink thin client"
 requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 dependencies = [
     "flask>=3.0",
     "pillow>=13.0",

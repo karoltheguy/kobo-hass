@@ -366,3 +366,7 @@ If HA can't be reached, the dashboard still renders: entity buttons go grey with
 ```sh
 uv run pytest
 ```
+
+## License
+
+GPL-3.0-or-later. See [LICENSE](LICENSE).
